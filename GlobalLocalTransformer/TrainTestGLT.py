@@ -30,29 +30,32 @@ class Trainer:
             
     # s_start = starting slice, s_end = ending slice
     def loadFullDataGLT(self, source_path, s_start, s_end,  labels_path=""):
-        X = np.load(source_path + "X_train_VBM_OpenBHB.npy")
-        Y = np.load(source_path + "Y_train_VBM_OpenBHB.npy")
-        print("Data tensor loaded... shape: ", X.shape )
-        labels = Y.loc[:,"age"]
+        print("Started loading data...")
+        X_train = np.load(source_path + "X_train_VBM_OpenBHB.npy")
+        X_test = np.load(source_path + "X_test_VBM_OpenBHB.npy")
+        Y_train = np.load(source_path + "Y_train_VBM_OpenBHB.npy")
+        Y_test = np.load(source_path + "Y_test_VBM_OpenBHB.npy")
+        print("Data loaded having shapes=> X-train: ", X_train.shape, 
+              " X-test: ", X_test.shape, " Y-train: ", Y_train.shape, 
+              " Y-test: ", Y_test.shape)
 
         # slice the 3D MRI volume and then reshape the tensor
-        X_s = X[:,:,:,s_start:s_end,0]
+        X_train_s = X_train[:,:,:,s_start:s_end,0]
+        X_test_s = X_test[:,:,:,s_start:s_end,0]
 
-        X_train, X_test, Y_train, Y_test = train_test_split(X_s, labels, test_size=0.2, random_state=42)
+        del X_train, X_test
 
-        X_train = torch.from_numpy(X_train)
-        X_train = X_train.permute(0,3,1,2)
+        X_train_s = torch.from_numpy(X_train_s)
+        X_train_s = X_train_s.permute(0,3,1,2)
 
-        X_test = torch.from_numpy(X_test)
-        X_test = X_test.permute(0,3,1,2)
-        print("Training set size: ", X_train.shape, ", Test set size: ", X_test.shape)
+        X_test_s = torch.from_numpy(X_test_s)
+        X_test_s = X_test_s.permute(0,3,1,2)
+        print("Sliced volume sizes: ", X_train_s.shape, X_test_s.shape)
 
         Y_train = torch.tensor(np.array(Y_train))
         Y_test = torch.tensor(np.array(Y_test))
-        # torch.tensor()
 
-        # print(Y_train.shape, Y_test.shape)
-        return X_train, X_test,  Y_train, Y_test
+        return X_train_s, X_test_s,  Y_train, Y_test
   
     def createDataLoaderGLT(self,src,num_train_samples, num_test_samples,batch_size=32,num_workers=4):
         # Create memory-mapped arrays
