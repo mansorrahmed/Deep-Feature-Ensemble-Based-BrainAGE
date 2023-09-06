@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+
+import warnings
+warnings.simplefilter("ignore")
+
 ##### dependencies ###
 # pytorch
 # numpy
@@ -15,6 +20,9 @@ import numpy as np
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset, Dataset
 import torch.optim as optim
+import argparse
+from argparse import ArgumentParser
+import time
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -30,14 +38,19 @@ class Trainer:
             
     # s_start = starting slice, s_end = ending slice
     def loadFullDataGLT(self, source_path, s_start, s_end,  labels_path=""):
-        print("Started loading data...")
+        """
+        returns the sliced tensors from the training and test set
+        """
+        print("Started loading data..")
         X_train = np.load(source_path + "X_train_VBM_OpenBHB.npy")
-        X_test = np.load(source_path + "X_test_VBM_OpenBHB.npy")
         Y_train = np.load(source_path + "Y_train_VBM_OpenBHB.npy")
+
+        X_test = np.load(source_path + "X_test_VBM_OpenBHB.npy")
         Y_test = np.load(source_path + "Y_test_VBM_OpenBHB.npy")
-        print("Data loaded having shapes=> X-train: ", X_train.shape, 
-              " X-test: ", X_test.shape, " Y-train: ", Y_train.shape, 
-              " Y-test: ", Y_test.shape)
+        
+        print("Data tensor loaded having shapes:> X-train: ", X_train.shape, 
+              "X-test: ", X_test.shape, "Y-train: ", Y_train.shape, "Y-test: ", Y_test.shape )
+        # labels = Y.loc[:,"age"]
 
         # slice the 3D MRI volume and then reshape the tensor
         X_train_s = X_train[:,:,:,s_start:s_end,0]
@@ -45,24 +58,29 @@ class Trainer:
 
         del X_train, X_test
 
+        # X_train, X_test, Y_train, Y_test = train_test_split(X_s, labels, test_size=0.2, random_state=42)
+
         X_train_s = torch.from_numpy(X_train_s)
         X_train_s = X_train_s.permute(0,3,1,2)
 
         X_test_s = torch.from_numpy(X_test_s)
         X_test_s = X_test_s.permute(0,3,1,2)
-        print("Sliced volume sizes: ", X_train_s.shape, X_test_s.shape)
+        print("Sliced training set size: ", X_train_s.shape, ", test set size: ", X_test_s.shape)
 
-        Y_train = torch.tensor(np.array(Y_train))
-        Y_test = torch.tensor(np.array(Y_test))
+        # Y_train = torch.tensor(np.array(Y_train))
+        # Y_test = torch.tensor(np.array(Y_test))
+        # torch.tensor()
 
+        # print(Y_train.shape, Y_test.shape)
         return X_train_s, X_test_s,  Y_train, Y_test
   
-    def createDataLoaderGLT(self,src,num_train_samples, num_test_samples,batch_size=32,num_workers=4):
+    def createDataLoaderGLT(self,src,numTrainSamples, numTestSamples,batchSize=32,num_workers=4):
         # Create memory-mapped arrays
-        X_train = np.memmap(src + 'X_train_VBM_OpenBHB.npy', dtype=float, mode='r', shape=(num_train_samples,121, 145, 121,1))
-        Y_train = np.memmap(src + 'Y_train_VBM_OpenBHB.npy', dtype=float, mode='r', shape=(num_train_samples,))
-        X_test = np.memmap(src + 'X_test_VBM_OpenBHB.npy', dtype=float, mode='r', shape=(num_test_samples,121, 145, 121,1))
-        Y_test = np.memmap(src + 'Y_test_VBM_OpenBHB.npy', dtype=float, mode='r', shape=(num_test_samples,))
+        X_train = np.memmap(src + 'X_train_VBM_OpenBHB.npy', dtype=float, mode='r', shape=(numTrainSamples,121, 145, 121,1))
+        Y_train = np.memmap(src + 'Y_train_VBM_OpenBHB.npy', dtype=float, mode='r', shape=(numTrainSamples,))
+        X_test = np.memmap(src + 'X_test_VBM_OpenBHB.npy', dtype=float, mode='r', shape=(numTestSamples,121, 145, 121,1))
+        Y_test = np.memmap(src + 'Y_test_VBM_OpenBHB.npy', dtype=float, mode='r', shape=(numTestSamples,))
+        print("Memory maps of the data tensors created...")
 
         # Custom Dataset class using memory-mapped arrays
         class myDataset(Dataset):
@@ -82,12 +100,15 @@ class Trainer:
         train_dataset = myDataset(X_train, Y_train)
         test_dataset = myDataset(X_test, Y_test)
 
-        train_dataloader = DataLoader(train_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
-        test_dataloader = DataLoader(test_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=True)
+        train_dataloader = DataLoader(train_dataset, batch_size=batchSize, num_workers=num_workers, shuffle=True)
+        test_dataloader = DataLoader(test_dataset, batch_size=batchSize, num_workers=num_workers, shuffle=True)
         return train_dataloader, test_dataloader
 
 
-    def trainGLT(self,  attention_model, regression_model,   criterion, optimizer, n_epochs, batch_size,X_train="", X_test="", Y_train="", Y_test="", data_loaded=True,src="",num_train_samples=0, num_test_samples =0, num_workers=8):
+    def trainGLT(self, model_dir, attention_model, regression_model,   criterion, optimizer, nEpochs, batchSize,
+                 X_train="", X_test="", Y_train="", Y_test="", loadData=True,src="",
+                 numTrainSamples=0, numTestSamples =0, num_workers=1):
+        self.model_dir = model_dir
         self.attention_model = attention_model
         self.regression_model = regression_model
         self.X_train = X_train
@@ -96,36 +117,43 @@ class Trainer:
         self.Y_test = Y_test
         self.criterion = criterion
         self.optimizer = optimizer
-        self.n_epochs = n_epochs
-        self.batch_size = batch_size
+        self.n_epochs = nEpochs
+        self.batch_size = batchSize
         self.train_loss = [] 
         self.val_acc = []
-        self.data_loaded = data_loaded
+        self.loadData = loadData
 
         # check if data is already loaded in the memory, otherwise split it into batches
-        if (data_loaded):
-            self.train_dataloader = DataLoader(list(zip(X_train, Y_train)), batch_size=batch_size, shuffle=True)
-            self.test_dataloader = DataLoader(list(zip(X_test, Y_test)), batch_size=batch_size, shuffle=True)
+        if (loadData):
+            self.train_dataloader = DataLoader(list(zip(X_train, Y_train)), batch_size=batchSize, shuffle=True)
+            self.test_dataloader = DataLoader(list(zip(X_test, Y_test)), batch_size=batchSize, shuffle=True)
         else:
             self.train_dataloader,self.test_dataloader = self.createDataLoaderGLT(src,
-                                                                                  num_train_samples,
-                                                                                  num_test_samples,
-                                                                                  batch_size,
+                                                                                  numTrainSamples,
+                                                                                  numTestSamples,
+                                                                                  batchSize,
                                                                                   num_workers)
         print("Created train-test data loaders...")
 
         # Loop through the number of epochs
-        for self.epoch in range(n_epochs):
+        for self.epoch in range(nEpochs):
+            begin = time.time()
+
             self.train_epoch_loss = 0  # Initialize loss for the entire epoch
             self.test_epoch_mae = 0   # Initialize the total MAE for the entire epoch
             optimizer.zero_grad()  # a clean up step for PyTorch
 
             loss = trainEpoch(self)
-            self.train_loss .append(loss)
+            self.train_loss.append(loss)
 
             
             mae = evaluateGLT(self)
             self.val_acc.append(mae)
+
+            time.sleep(1)
+            # store end time
+            end = time.time()
+            print("Epoch ", self.epoch, " competed in time: ", round((end - begin), 2))
             
         return self.train_loss , self.val_acc
     
@@ -135,29 +163,40 @@ def trainEpoch(self):
     Training loop -> train the model using the entire training set for one complete epoch 
     """   
     print("Training epoch ",self.epoch," started.." )
+
     # Loop through the batches and update the gradients after each batch
     for X_batch, y_batch in self.train_dataloader:
-        if (self.data_loaded==False):
+        if (self.loadData==False):
             X_batch = X_batch[:,:,:,55:60,0]
             X_batch = X_batch.permute(0,3,1,2)
+        # Obtaining the cuda parameters
+        X_batch = X_batch.to(device=self.device)
+        y_batch = y_batch.to(device=self.device)
+        
         self.regression_model.train()
         zlist = self.attention_model(X_batch)             # forward pass
-        output_tensors = torch.cat(zlist, dim=1)
+        output_tensors = torch.cat(zlist, dim=1).to(device=self.device)
         self.batch_loss = 0
+        # loop through each sample in the current batch 
         for i in range(len(X_batch)):
-            output = self.regression_model(output_tensors[i])
+            # get the output values (ages) as the output of the last layer
+            output = self.regression_model(output_tensors[i]).to(device=self.device)
             loss = self.criterion(output, y_batch[i])  # Compute the loss for each sample
             self.batch_loss += loss  # Accumulate the loss for the entire batch
             self.train_epoch_loss += loss  # Accumulate the loss for the entire epoch
             
         batch_avg_loss = self.batch_loss / len(X_batch)  # Calculate the average loss for the batch
-        batch_avg_loss.backward(retain_graph=True)  # Backward pass (compute parameter updates)
+        batch_avg_loss.backward()  # Backward pass (compute parameter updates)
         # print("Batch completed")
         self.optimizer.step()
 
 
     train_epoch_avg_loss = round((self.train_epoch_loss / len(self.train_dataloader.dataset)).item(),3)
     print("Epoch:", self.epoch, "Loss:", train_epoch_avg_loss)
+    # Save the model's state dictionary after each epoch
+    model_path = f'{self.model_dir}model_epoch_{self.epoch}.pth'
+    torch.save(self.model.state_dict(), model_path)
+
     return train_epoch_avg_loss
 
 
@@ -170,15 +209,20 @@ def evaluateGLT(self):
     with torch.no_grad():
         # loop through each batch of the test set and compute the evaluation metrics
         for X_batch, y_batch in self.test_dataloader:
-            if (self.data_loaded==False):
+            if (self.loadData==False):
                 X_batch = X_batch[:,:,:,55:60,0]
                 X_batch = X_batch.permute(0,3,1,2)
+
+            # Obtaining the cuda parameters
+            X_batch = X_batch.to(device=self.device)
+            y_batch = y_batch.to(device=self.device)
+            
             total_samples = 0
             zlist = self.attention_model(X_batch)             # forward pass
-            output_tensors = torch.cat(zlist, dim=1)
+            output_tensors = torch.cat(zlist, dim=1).to(device=self.device)
             self.batch_mae = 0
             for i in range(len(X_batch)):
-                output = self.regression_model(output_tensors[i])
+                output = self.regression_model(output_tensors[i]).to(device=self.device)
                 mae = torch.mean(torch.abs(output - y_batch[i]))
                 self.test_epoch_mae += mae.item() # Accumulate the loss for the entire epoch
                 self.batch_mae += mae.item() # Accumulate the loss for the entire batch
@@ -193,33 +237,57 @@ def evaluateGLT(self):
 def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # Create the model, optimizer, loss function and trainer
-    attention_model = GlobalLocalBrainAge(5, patch_size=32, step=32,
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Build and train a vision transformer for brain age estimation",
+                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("src", help="Data source path")
+    parser.add_argument("dst", help="Save model weights path")
+    parser.add_argument("dataShape", type=tuple, help="Shape of a MRI [default 121*145*121]", nargs='?', default=(121, 145, 121), const=(121, 145, 121))
+    parser.add_argument("numTrainSamples", type=int, help="Number of training samples [default for OpenBHB is 3172]", nargs='?', default=3172, const=3172)
+    parser.add_argument("numTestSamples", type=int, help="Number of test samples [default for OpenBHB is 794]", nargs='?', default=794, const=794)
+    parser.add_argument("loadData", type=bool, help="Load the train-test data tensors [default = True]", nargs='?', default=True, const=True)
+    parser.add_argument("epochs", type=int, help="No of epochs")
+    parser.add_argument("batchSize", type=int, help="Batch size")
+    
+
+    args = vars(parser.parse_args())
+    src = args["src"]
+    dst = args["dst"]
+    dataShape = args["dataShape"]
+    numTrainSamples = args["numTrainSamples"]
+    numTestSamples = args["numTestSamples"]
+    loadData = args["loadData"]
+    nEpochs = args["epochs"]
+    batchSize = args["batchSize"]
+
+
+    # create/ instantiate the model, optimizer, loss function and trainer
+    attention_model = GlobalLocalBrainAge(5, patch_size=64, step=32,
                         nblock=6, backbone='vgg8')
-    regression_model = nn.Linear(13, 1)
-    attention_model = attention_model.double()
+    regression_model = nn.Linear(13, 1).to(device=device)
+    attention_model = attention_model.double().to(device=device)
     regression_model = regression_model.double()
-    criterion = nn.L1Loss()
+    criterion = nn.L1Loss().to(device=device)
     optimizer = optim.Adam(regression_model.parameters(), lr=0.0002)
-    src = "/media/dataanalyticlab/Drive2/MANSOOR/Dataset/OpenBHB/VBM_OpenBHB/"
+
+    # Define the path to save the model after each epoch
+    model_dir = dst
+
+    # instantiate the trainer class
     trainer = Trainer(attention_model, optimizer, criterion, device=device)
 
-    data_loaded = False
-    num_train_samples = 3172
-    num_test_samples = 794
-
-    if (data_loaded):
+    if (loadData):
         X_train, X_test,  Y_train, Y_test = trainer.loadFullDataGLT(src, 55,60,src)
     else:
         X_train, X_test,  Y_train, Y_test = ["" for i in range(4)]
 
     # OpenBHB X_train = (3172,121,145,121,1), X_test = (794,121,145,121,1)
-    trainer.trainGLT(attention_model, regression_model,criterion,
-                      optimizer, n_epochs=20, 
-                     batch_size=32, X_train=X_train, X_test=X_test,  
-                     Y_train=Y_train, Y_test=Y_test, data_loaded=data_loaded,src=src,
-                     num_train_samples=num_train_samples, 
-                     num_test_samples=num_test_samples,
+    trainer.trainGLT(model_dir, attention_model, regression_model,criterion,
+                      optimizer, nEpochs=nEpochs, 
+                     batchSize=batchSize, X_train=X_train, X_test=X_test,  
+                     Y_train=Y_train, Y_test=Y_test, loadData=loadData,src=src,
+                     numTrainSamples=numTrainSamples, 
+                     numTestSamples=numTestSamples,
                      num_workers=1)
 
 

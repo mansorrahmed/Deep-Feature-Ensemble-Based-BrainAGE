@@ -1,19 +1,21 @@
 #!/usr/bin/env python
 
+"""
+dependencies:
+- NVIDIA driver v536
+- CUDA toolkit v11.2
+- cuDNN library v8.1
+- tensorflow v2.10
+- python v3.10
+"""
+
 import warnings
 warnings.simplefilter("ignore")
 
-import pandas as pd
-import os
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score,mean_absolute_error
 import numpy as np
-import math
-import sys
 from tensorflow.keras.models import load_model
-import random
-import glob
-import re
 from collections import defaultdict
 from tensorflow.keras.optimizers import Adam, SGD,Adagrad
 from tensorflow.compat.v1 import reset_default_graph
@@ -36,22 +38,26 @@ parser = argparse.ArgumentParser(description="Build and train a ResNet model for
 parser.add_argument("src", help="Source location")
 parser.add_argument("dataShape", type=tuple, help="Shape of a MRI [default 121*145*121]", nargs='?', default=(121, 145, 121), const=(121, 145, 121))
 parser.add_argument("epochs", type=int, help="No of epochs")
+parser.add_argument("batches", type=int, help="No of batches")
 
 args = vars(parser.parse_args())
 src = args["src"]
 dataShape = args["dataShape"]
 nEpochs = args["epochs"]
+batchSize = args["batches"]
 
 # dataShape = (121, 145, 121)
+
+print("Loading the data..")
 
 X_train = np.load(src + "X_train_VBM_OpenBHB.npy")
 X_test = np.load(src + "X_test_VBM_OpenBHB.npy")
 Y_train = np.load(src + "Y_train_VBM_OpenBHB.npy")
 Y_test = np.load(src + "Y_test_VBM_OpenBHB.npy")
 
+print("Data loaded having shapes: X-train", X_train.shape, " X-test ", X_test.shape)
 
 ############ model hyperparameters #################
-batchSize = 4
 steps_per_epoch= X_train.shape[0]//batchSize
 validation_steps = X_test.shape[0]//batchSize
 default_parameters = [0.001,1e-6,'RawImg','IncludeGender','IncludeScanner',0.00005,0.2,40,10]
@@ -76,10 +82,9 @@ h = model.fit(x=X_train, y=Y_train,
                         validation_steps=validation_steps,
                         steps_per_epoch=steps_per_epoch, 
                         epochs=nEpochs,
+                        batch_size=batchSize,
                         verbose=1,
                         max_queue_size=32,
-                        workers=4,
-                        use_multiprocessing=False,
                         callbacks=[mc,early]
                            )
 print("Model fitted...")
