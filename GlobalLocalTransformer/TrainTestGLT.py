@@ -30,10 +30,10 @@ class Trainer:
     """
     The simple trainer.
     """
-    def __init__(self, model, optimizer, loss_fn, device):
+    def __init__(self, model, optimizer, criterion, device):
         self.model = model
         self.optimizer = optimizer
-        self.loss_fn = loss_fn
+        self.criterion = criterion
         self.device = device
             
     # s_start = starting slice, s_end = ending slice

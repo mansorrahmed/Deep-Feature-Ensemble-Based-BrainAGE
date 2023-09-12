@@ -3,7 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class SFCN(nn.Module):
-    def __init__(self, channel_number=[32, 64, 128, 256, 256, 64], output_dim=40, dropout=True):
+    def __init__(self, channel_number=[32, 64, 128, 256, 256, 64],
+                  output_dim=83, dropout=True):
         super(SFCN, self).__init__()
         n_layer = len(channel_number)
         self.feature_extractor = nn.Sequential()
@@ -45,20 +46,22 @@ class SFCN(nn.Module):
                 nn.Conv3d(in_channel, out_channel, padding=padding, kernel_size=kernel_size),
                 nn.BatchNorm3d(out_channel),
                 nn.MaxPool3d(2, stride=maxpool_stride),
-                nn.ReLU(),
+                nn.ReLU(inplace=False)
             )
         else:
             layer = nn.Sequential(
                 nn.Conv3d(in_channel, out_channel, padding=padding, kernel_size=kernel_size),
                 nn.BatchNorm3d(out_channel),
-                nn.ReLU()
+                nn.ReLU(inplace=False)
             )
         return layer
 
     def forward(self, x):
         out = list()
         x_f = self.feature_extractor(x)
-        x = self.classifier(x_f)
+        # create a copy/clone to avoid any inplace modifications during forward computation
+        x_f_copy = x_f.clone()
+        x = self.classifier(x_f_copy)
         x = F.log_softmax(x, dim=1)
         out.append(x)
         return out

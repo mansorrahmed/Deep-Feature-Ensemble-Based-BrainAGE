@@ -7,8 +7,9 @@ def my_KLDivLoss(x, y):
     b) the y distribution is added with a small value (1e-16) to prevent log(0) problem
     """
     loss_func = nn.KLDivLoss(reduction='sum')
-    y += 1e-16
+    # create a copy/clone to avoid any inplace modifications during forward computation
+    y_copy = y.clone() + 1e-16
     n = y.shape[0]
-    loss = loss_func(x, y) / n
+    loss = loss_func(x, y_copy) / n
     #print(loss)
     return loss
