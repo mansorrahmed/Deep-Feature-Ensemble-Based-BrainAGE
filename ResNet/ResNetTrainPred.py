@@ -62,7 +62,7 @@ class Trainer:
    def createModel(self):
         
       ############ model hyperparameters #################
-      default_parameters = [1e-6,'RawImg','IncludeGender','IncludeScanner',0.00005,0.2,40,10]
+      default_parameters = [1e-8,'RawImg','IncludeGender','IncludeScanner',0.0005,0.2,40,10]
       self.decayRate, self.meanImg, self.gender, self.scanner,self.regAmount, self.dropRate, maxAngle,maxShift = default_parameters
 
       ######### build model #############

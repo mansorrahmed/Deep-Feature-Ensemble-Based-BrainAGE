@@ -135,6 +135,8 @@ class Trainer:
                 # Forward propagation
                 output = self.sfcnModel(sample)
                 output = output[0].reshape([1, -1]).to(device=self.device)
+                # output is a tensor containing the soft labels (83 values) of the particular subject
+
                 # Compute the loss for each sample
                 loss = dpl.my_KLDivLoss(output, y_batch[i])
 
