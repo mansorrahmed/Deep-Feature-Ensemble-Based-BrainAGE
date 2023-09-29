@@ -6,9 +6,7 @@ from sklearn.metrics import r2_score,mean_absolute_error
 import numpy as np
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset, Dataset
-from sfcn import SFCN
-import dp_loss as dpl
-import dp_utils as dpu
+from resnet import resnet18
 import torch.optim as optim
 import argparse
 from argparse import ArgumentParser
@@ -249,19 +247,19 @@ if __name__ == '__main__':
 
     # create/ instantiate the model, optimizer, loss function and trainer
 
-    sfcnModel = SFCN().to(device=device)
-    sfcnModel = sfcnModel.double()
-    criterion = nn.L1Loss()
-    optimizer = optim.SGD(sfcnModel.parameters(), lr=lr) 
+    resnetModel = resnet18().to(device=device)
+    resnetModel = resnetModel.double()
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(resnetModel.parameters(), lr=lr) 
 
     # instantiate the trainer class
     trainer = Trainer(batchSize=batchSize, lr=lr, nEpochs=nEpochs, 
                       device=device, validate=validate)
     if (len(trainedModelFile)==0):
-        trainer.buildModel(Model=sfcnModel, criterion=criterion,
+        trainer.buildModel(Model=resnetModel, criterion=criterion,
                         optimizer=optimizer, model_dir=model_dir)
     else:
-        trainer.loadCheckpoint(model=sfcnModel, optimizer=optimizer,
+        trainer.loadCheckpoint(model=resnetModel, optimizer=optimizer,
                                 load_path=trainedModelFile, model_dir=model_dir)
     trainer.createDataLoader(source_path=source_path)
     trainer.trainModel()
