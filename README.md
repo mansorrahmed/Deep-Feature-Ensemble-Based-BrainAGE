@@ -1,6 +1,6 @@
 # Brain Age Estimation with Ensemble-Based Deep Feature Extraction
 
-![Project Image](path/to/your/project/image.png) <!-- If you have a project image, include it here -->
+<!-- ![Project Image](path/to/your/project/image.png) If you have a project image, include it here -->
 
 ## Overview
 
